@@ -36,9 +36,10 @@ export default function App() {
   }
 
   const gotoStoreDetail = async (id: string) => {
-    setLoading(true)
+    setLoading(true); setError('')
     const r = await api.storeDetail(id)
     if (r.success && r.data) { setStoreDetail(r.data); setView('detail') }
+    else { setError(r.error || '加载门店详情失败，请检查AirScript配置') }
     setLoading(false)
   }
 
