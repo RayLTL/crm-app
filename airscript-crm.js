@@ -37,8 +37,11 @@ function getAllRecords(sheetId) {
 }
 
 function getRecordById(sheetId, recordId) {
-  var response = Application.Record.GetRecord({ SheetId: sheetId, RecordId: recordId });
-  return response && response.record ? response.record : null;
+  var records = getAllRecords(sheetId);
+  for (var i = 0; i < records.length; i++) {
+    if (String(records[i].id) === String(recordId)) return records[i];
+  }
+  return null;
 }
 
 function normalizeDate(d) {
