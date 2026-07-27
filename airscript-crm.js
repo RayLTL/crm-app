@@ -492,35 +492,25 @@ function handleOpportunityUpdate(params) {
   if (params.amount !== undefined) allFields["预计金额"] = params.amount;
   if (params.name !== undefined) allFields["商机名称"] = params.name;
 
-  // 方式A: 用 JSON.stringify 序列化 fields
-  var fieldsStr = JSON.stringify(allFields);
+  // 由于 UpdateRecords 对 SingleSelect 字段不支持更新，改用 删除+重建 方式
   try {
-    var resultA = Application.Record.UpdateRecords({
+    // 1. 删除旧记录
+    Application.Record.DeleteRecords({
       SheetId: SHEETS.OPPORTUNITY,
-      Records: [{ id: record.id, fields: fieldsStr }]
+      Records: [{ id: record.id }]
     });
-    return successResponse({
-      id: params.recordId,
-      method: "A",
-      stageSent: String(allFields["阶段"]),
-      apiResult: JSON.stringify(resultA)
-    }, "商机更新完成");
-  } catch (eA) {
-    // 方式B: 用对象格式 fields
-    try {
-      var resultB = Application.Record.UpdateRecords({
-        SheetId: SHEETS.OPPORTUNITY,
-        Records: [{ id: record.id, fields: allFields }]
-      });
-      return successResponse({
-        id: params.recordId,
-        method: "B",
-        stageSent: String(allFields["阶段"]),
-        apiResult: JSON.stringify(resultB)
-      }, "商机更新完成");
-    } catch (eB) {
-      return errorResponse("方式A:" + String(eA) + " | 方式B:" + String(eB), 500);
-    }
+    
+    // 2. 创建新记录（带更新后的字段）
+    var createResp = Application.Record.CreateRecords({
+      SheetId: SHEETS.OPPORTUNITY,
+      Records: [{ fields: allFields }]
+    });
+    var created = Array.isArray(createResp) ? createResp[0] : createResp;
+    if (!created || !created.id) return errorResponse("重建商机记录失败", 500);
+    
+    return successResponse({ id: created.id, newId: created.id }, "商机更新成功");
+  } catch (e) {
+    return errorResponse("更新商机失败: " + String(e), 500);
   }
 }
 
