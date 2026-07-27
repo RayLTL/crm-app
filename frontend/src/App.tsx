@@ -52,6 +52,15 @@ export default function App() {
     setLoading(false)
   }
 
+  const gotoStoreFromOpp = async (id: string) => {
+    setTab('stores')
+    setLoading(true); setError('')
+    const r = await api.storeDetail(id)
+    if (r.success && r.data) { setStoreDetail(r.data); setView('detail') }
+    else { setError(r.error || '加载门店详情失败') }
+    setLoading(false)
+  }
+
   // ====== 渲染 ======
   return (
     <div className="app">
@@ -106,7 +115,7 @@ export default function App() {
 
         {/* ====== 商机详情 ====== */}
         {tab === 'opportunities' && view === 'detail' && opportunityDetail && (
-          <OpportunityDetailView detail={opportunityDetail} onRefresh={() => gotoOpportunityDetail(opportunityDetail.id)} onStoreClick={gotoStoreDetail} />
+          <OpportunityDetailView detail={opportunityDetail} onRefresh={() => gotoOpportunityDetail(opportunityDetail.id)} onStoreClick={gotoStoreFromOpp} />
         )}
 
         {/* ====== 联系人 ====== */}
@@ -360,12 +369,21 @@ function OpportunityDetailView({ detail, onRefresh, onStoreClick }: { detail: Op
   const [submitting, setSubmitting] = useState(false)
   const [stageLoading, setStageLoading] = useState<string | null>(null)
   const [stageError, setStageError] = useState('')
+  const [editError, setEditError] = useState('')
 
   if (editing) {
     return (
       <div className="form-page">
         <h2 className="form-title">编辑商机</h2>
-        <form className="form" onSubmit={async e => { e.preventDefault(); setSubmitting(true); await api.opportunityUpdate(detail.id, { amount: Number(editAmount), stage: editStage }); onRefresh(); setEditing(false); setSubmitting(false) }}>
+        <form className="form" onSubmit={async e => {
+          e.preventDefault(); setSubmitting(true); setEditError('');
+          try {
+            const r = await api.opportunityUpdate(detail.id, { amount: Number(editAmount), stage: editStage });
+            if (r.success) { onRefresh(); setEditing(false); }
+            else { setEditError(r.error || '保存失败'); }
+          } catch (e: any) { setEditError('网络错误: ' + (e.message || '')); }
+          setSubmitting(false)
+        }}>
           <div className="form-group">
             <label className="form-label">商机名称</label>
             <input className="form-input" value={detail.name} disabled />
@@ -380,6 +398,7 @@ function OpportunityDetailView({ detail, onRefresh, onStoreClick }: { detail: Op
               {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
+          {editError && <div className="error-msg" style={{ padding: '8px 12px', background: '#fef2f2', color: '#dc2626', borderRadius: 6, fontSize: 13, marginBottom: 12 }}>{editError}</div>}
           <div className="form-actions">
             <button type="button" className="btn btn-secondary" onClick={() => setEditing(false)} disabled={submitting}>取消</button>
             <button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? '提交中...' : '保存'}</button>

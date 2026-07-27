@@ -461,8 +461,13 @@ function handleOpportunityUpdate(params) {
       SheetId: SHEETS.OPPORTUNITY,
       Records: [{ id: params.recordId, fields: updateFields }]
     });
-    if (!result) return errorResponse("更新商机失败：API无返回", 500);
-    return successResponse({ id: params.recordId }, "商机更新成功");
+    if (!result) return errorResponse("更新商机失败：API返回空", 500);
+    // 检查返回结果是否有records
+    if (result.records && result.records.length > 0) {
+      return successResponse({ id: params.recordId, result: JSON.stringify(result) }, "商机更新成功");
+    }
+    // 如果返回结果没有records但也不是空，可能API返回格式不同
+    return successResponse({ id: params.recordId, result: JSON.stringify(result) }, "商机更新可能成功");
   } catch (e) {
     return errorResponse("更新商机失败：" + String(e), 500);
   }
