@@ -479,6 +479,10 @@ function handleOpportunityUpdate(params) {
   var record = getRecordById(SHEETS.OPPORTUNITY, params.recordId);
   if (!record) return errorResponse("商机不存在", 404);
   
+  // 查看record对象的所有属性
+  var recordKeys = [];
+  for (var rk in record) { recordKeys.push(rk + ":" + typeof record[rk] + "=" + String(record[rk])); }
+
   var allFields = {};
   var origFields = record.fields || {};
   for (var k in origFields) {
@@ -499,23 +503,12 @@ function handleOpportunityUpdate(params) {
       method: "A",
       recordIdType: typeof record.id,
       recordId: String(record.id),
+      recordKeys: recordKeys.join(" | "),
+      stageSent: allFields["阶段"],
       apiResult: JSON.stringify(resultA)
     }, "商机更新完成");
   } catch (eA) {
-    // 方式B: 用 params.recordId (前端传过来的ID)
-    try {
-      var resultB = Application.Record.UpdateRecords({
-        SheetId: SHEETS.OPPORTUNITY,
-        Records: [{ id: params.recordId, fields: allFields }]
-      });
-      return successResponse({
-        id: params.recordId,
-        method: "B",
-        apiResult: JSON.stringify(resultB)
-      }, "商机更新完成");
-    } catch (eB) {
-      return errorResponse("更新失败 A:" + String(eA) + " | B:" + String(eB), 500);
-    }
+    return errorResponse("更新失败: " + String(eA), 500);
   }
 }
 
