@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from './api'
-import type { Store, StoreDetail, Contact, Contract, Followup, Opportunity, DashboardData } from './types'
+import type { Store, StoreDetail, Contact, Contract, Followup, Opportunity, OpportunityDetail, DashboardData } from './types'
 import { STORE_STATUS, STAGES, ALERT_MAP } from './types'
 
 type Tab = 'dashboard' | 'stores' | 'opportunities' | 'contacts'
@@ -14,6 +14,7 @@ export default function App() {
   const [dash, setDash] = useState<DashboardData | null>(null)
   const [stores, setStores] = useState<Store[]>([])
   const [storeDetail, setStoreDetail] = useState<StoreDetail | null>(null)
+  const [opportunityDetail, setOpportunityDetail] = useState<OpportunityDetail | null>(null)
   const [opportunities, setOpportunities] = useState<Opportunity[]>([])
   const [filterStatus, setFilterStatus] = useState('')
   const [filterKeyword, setFilterKeyword] = useState('')
@@ -35,6 +36,14 @@ export default function App() {
     if (r.success && r.data) setOpportunities(r.data.items)
   }
 
+  const gotoOpportunityDetail = async (id: string) => {
+    setLoading(true); setError('')
+    const r = await api.opportunityDetail(id)
+    if (r.success && r.data) { setOpportunityDetail(r.data); setView('detail') }
+    else { setError(r.error || '加载商机详情失败') }
+    setLoading(false)
+  }
+
   const gotoStoreDetail = async (id: string) => {
     setLoading(true); setError('')
     const r = await api.storeDetail(id)
@@ -51,11 +60,11 @@ export default function App() {
         <h1 className="logo">
           {tab === 'dashboard' && '4S店销售CRM'}
           {tab === 'stores' && (view === 'detail' ? '门店详情' : '门店管理')}
-          {tab === 'opportunities' && '商机看板'}
+          {tab === 'opportunities' && (view === 'detail' ? '商机详情' : '商机看板')}
           {tab === 'contacts' && '联系人'}
         </h1>
         {(view === 'detail' || view === 'form') && (
-          <button className="btn-back" onClick={() => { setView('list'); setStoreDetail(null) }}>返回</button>
+          <button className="btn-back" onClick={() => { setView('list'); setStoreDetail(null); setOpportunityDetail(null) }}>返回</button>
         )}
       </header>
 
@@ -92,7 +101,12 @@ export default function App() {
 
         {/* ====== 商机看板 ====== */}
         {tab === 'opportunities' && (
-          <KanbanView opportunities={opportunities} onRefresh={loadOpportunities} />
+          <KanbanView opportunities={opportunities} onRefresh={loadOpportunities} onOppClick={gotoOpportunityDetail} />
+        )}
+
+        {/* ====== 商机详情 ====== */}
+        {tab === 'opportunities' && view === 'detail' && opportunityDetail && (
+          <OpportunityDetailView detail={opportunityDetail} onRefresh={() => gotoOpportunityDetail(opportunityDetail.id)} />
         )}
 
         {/* ====== 联系人 ====== */}
@@ -290,7 +304,7 @@ function ContractCard({ contract }: { contract: Contract }) {
 }
 
 // ====== 商机看板 ======
-function KanbanView({ opportunities, onRefresh }: { opportunities: Opportunity[]; onRefresh: () => void }) {
+function KanbanView({ opportunities, onRefresh, onOppClick }: { opportunities: Opportunity[]; onRefresh: () => void; onOppClick: (id: string) => void }) {
   const [form, setForm] = useState(false)
   const [stageFilter, setStageFilter] = useState('')
 
@@ -316,11 +330,11 @@ function KanbanView({ opportunities, onRefresh }: { opportunities: Opportunity[]
           <div key={g.stage} className="stage-group">
             <div className="stage-title">{g.stage} ({g.items.length})</div>
             {g.items.map(o => (
-              <div key={o.id} className="opp-card">
+              <div key={o.id} className="opp-card" onClick={() => onOppClick(o.id)}>
                 <div className="opp-name">{o.name}</div>
                 <div className="opp-store">{o.store_name}</div>
                 <div className="opp-amount">¥{o.amount.toLocaleString()}</div>
-                <div className="opp-actions">
+                <div className="opp-actions" onClick={e => e.stopPropagation()}>
                   {STAGES.map(s => s !== g.stage && (
                     <button key={s} className="btn btn-xs" onClick={() => changeStage(o.id, s)}>{s}</button>
                   ))}
@@ -330,6 +344,94 @@ function KanbanView({ opportunities, onRefresh }: { opportunities: Opportunity[]
           </div>
         ))}
         {filtered.length === 0 && <div className="empty">暂无商机</div>}
+      </div>
+    </div>
+  )
+}
+
+// ====== 商机详情 ======
+function OpportunityDetailView({ detail, onRefresh }: { detail: OpportunityDetail; onRefresh: () => void }) {
+  const [editing, setEditing] = useState(false)
+  const [editAmount, setEditAmount] = useState(String(detail.amount))
+  const [editStage, setEditStage] = useState(detail.stage)
+  const [submitting, setSubmitting] = useState(false)
+
+  if (editing) {
+    return (
+      <div className="form-page">
+        <h2 className="form-title">编辑商机</h2>
+        <form className="form" onSubmit={async e => { e.preventDefault(); setSubmitting(true); await api.opportunityUpdate(detail.id, { amount: Number(editAmount), stage: editStage }); onRefresh(); setEditing(false); setSubmitting(false) }}>
+          <div className="form-group">
+            <label className="form-label">商机名称</label>
+            <input className="form-input" value={detail.name} disabled />
+          </div>
+          <div className="form-group">
+            <label className="form-label">预计金额</label>
+            <input className="form-input" type="number" value={editAmount} onChange={e => setEditAmount(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">阶段</label>
+            <select className="form-input" value={editStage} onChange={e => setEditStage(e.target.value)}>
+              {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div className="form-actions">
+            <button type="button" className="btn btn-secondary" onClick={() => setEditing(false)} disabled={submitting}>取消</button>
+            <button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? '提交中...' : '保存'}</button>
+          </div>
+        </form>
+      </div>
+    )
+  }
+
+  return (
+    <div className="store-detail">
+      <div className="detail-hero">
+        <h2>{detail.name}</h2>
+        <div className="detail-tags">
+          <span className="tag" style={{ background: '#6366f1' }}>{detail.stage}</span>
+        </div>
+        <button className="btn btn-sm btn-outline" onClick={() => setEditing(true)}>编辑商机</button>
+      </div>
+
+      <div className="sub-section" style={{ marginTop: 16 }}>
+        <div className="info-grid">
+          <div className="info-item"><span className="info-label">预计金额</span><span style={{ fontSize: 18, fontWeight: 600, color: 'var(--primary)' }}>¥{Number(detail.amount).toLocaleString()}</span></div>
+          <div className="info-item"><span className="info-label">当前阶段</span><span>{detail.stage}</span></div>
+          <div className="info-item"><span className="info-label">创建时间</span><span>{detail.created_at}</span></div>
+        </div>
+      </div>
+
+      {detail.store && (
+        <div className="sub-section" style={{ marginTop: 12 }}>
+          <div className="section-hd"><span>关联门店</span></div>
+          <div className="store-card" style={{ marginTop: 8, cursor: 'default' }}>
+            <div className="store-header">
+              <div className="store-avatar">{detail.store.name.charAt(0)}</div>
+              <div className="store-info">
+                <div className="store-name">{detail.store.name}</div>
+                <div className="store-meta">{detail.store.brand} · {detail.store.region}</div>
+              </div>
+              <span className="store-status" style={{ background: detail.store.status === '已签约' ? '#22c55e' : '#6b7280' }}>{detail.store.status}</span>
+            </div>
+            <div className="store-footer">
+              <span>{detail.store.address || ''}</span>
+              <span className="store-arrow">›</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="sub-section" style={{ marginTop: 12 }}>
+        <div className="section-hd"><span>快速推进</span></div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+          {STAGES.map(s => s !== detail.stage && (
+            <button key={s} className="btn btn-sm" style={{ background: '#f3f4f6', border: '1px solid #e5e7eb' }}
+              onClick={async () => { await api.opportunityUpdate(detail.id, { stage: s }); onRefresh() }}>
+              推进至{s}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )

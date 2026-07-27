@@ -1,4 +1,4 @@
-import type { ApiResponse, Store, StoreDetail, Contact, Contract, Followup, Opportunity, DashboardData, ListResult } from './types'
+import type { ApiResponse, Store, StoreDetail, Contact, Contract, Followup, Opportunity, OpportunityDetail, DashboardData, ListResult } from './types'
 
 const AIRSCRIPT_URL = import.meta.env.VITE_AIRSCRIPT_URL || ''
 const AIRSCRIPT_TOKEN = import.meta.env.VITE_AIRSCRIPT_TOKEN || ''
@@ -45,5 +45,6 @@ export const api = {
   // 商机
   opportunityList: (stage?: string) => airscriptFetch<ListResult<Opportunity>>('opportunityList', stage ? { stage } : {}),
   opportunityCreate: (d: any) => airscriptFetch<{ id: string }>('opportunityCreate', d),
+  opportunityDetail: (recordId: string) => airscriptFetch<OpportunityDetail>('opportunityDetail', { recordId }),
   opportunityUpdate: (recordId: string, d: any) => airscriptFetch<{ id: string }>('opportunityUpdate', { recordId, ...d }),
 }

@@ -412,6 +412,41 @@ function handleOpportunityCreate(params) {
   return successResponse({ id: created.id }, "商机创建成功");
 }
 
+function handleOpportunityDetail(params) {
+  if (!params.recordId) return errorResponse("缺少 recordId", 400);
+  var record = getRecordById(SHEETS.OPPORTUNITY, params.recordId);
+  if (!record) return errorResponse("商机不存在", 404);
+  var f = record.fields || {};
+  
+  // 获取关联门店信息
+  var storeInfo = null;
+  if (f["门店ID"]) {
+    var storeRecord = getRecordById(SHEETS.STORE, f["门店ID"]);
+    if (storeRecord) {
+      var sf = storeRecord.fields || {};
+      storeInfo = {
+        id: storeRecord.id,
+        name: sf["门店名称"] || "",
+        brand: sf["主营品牌"] || "",
+        region: sf["地区"] || "",
+        address: sf["详细地址"] || "",
+        status: sf["合作状态"] || "",
+      };
+    }
+  }
+
+  return successResponse({
+    id: record.id,
+    name: f["商机名称"] || "",
+    store_id: f["门店ID"] || "",
+    store_name: f["门店名称"] || "",
+    amount: f["预计金额"] || 0,
+    stage: f["阶段"] || "初步触达",
+    created_at: normalizeDate(f["创建时间"] || ""),
+    store: storeInfo,
+  });
+}
+
 function handleOpportunityUpdate(params) {
   if (!params.recordId) return errorResponse("缺少 recordId", 400);
   var updateFields = {};
@@ -518,9 +553,10 @@ function main() {
     case "followupList":   return handleFollowupList(params);
     case "followupCreate": return handleFollowupCreate(params);
     // 商机
-    case "opportunityList":   return handleOpportunityList(params);
-    case "opportunityCreate": return handleOpportunityCreate(params);
-    case "opportunityUpdate": return handleOpportunityUpdate(params);
+    case "opportunityList":     return handleOpportunityList(params);
+    case "opportunityDetail":  return handleOpportunityDetail(params);
+    case "opportunityCreate":  return handleOpportunityCreate(params);
+    case "opportunityUpdate":  return handleOpportunityUpdate(params);
     // 首页
     case "dashboard":      return handleDashboard();
     // 健康检查

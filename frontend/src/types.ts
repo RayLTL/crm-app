@@ -33,6 +33,14 @@ export interface Opportunity {
   amount: number; stage: string
 }
 
+export interface OpportunityDetail extends Opportunity {
+  created_at: string
+  store: {
+    id: string; name: string; brand: string
+    region: string; address: string; status: string
+  } | null
+}
+
 // ===== 首页 =====
 export interface DashboardData {
   monthVisits: number; monthRenewals: number; totalDeal: number
