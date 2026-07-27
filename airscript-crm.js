@@ -456,20 +456,26 @@ function handleOpportunityUpdate(params) {
   if (params.stage !== undefined) updateFields["阶段"] = params.stage;
   if (params.amount !== undefined) updateFields["预计金额"] = params.amount;
   if (params.name !== undefined) updateFields["商机名称"] = params.name;
+
+  // 方式1: 尝试用 UpdateRecord (单数) — 参数格式不同
   try {
-    var result = Application.Record.UpdateRecords({
+    var result = Application.Record.UpdateRecord({
       SheetId: SHEETS.OPPORTUNITY,
-      Records: [{ id: params.recordId, fields: updateFields }]
+      RecordId: params.recordId,
+      Fields: updateFields
     });
-    if (!result) return errorResponse("更新商机失败：API返回空", 500);
-    // 检查返回结果是否有records
-    if (result.records && result.records.length > 0) {
-      return successResponse({ id: params.recordId, result: JSON.stringify(result) }, "商机更新成功");
+    return successResponse({ id: params.recordId, method: "UpdateRecord", apiResult: JSON.stringify(result) }, "商机更新成功");
+  } catch (e1) {
+    // 方式2: 回退到 UpdateRecords (复数) — 原有格式
+    try {
+      var result2 = Application.Record.UpdateRecords({
+        SheetId: SHEETS.OPPORTUNITY,
+        Records: [{ id: params.recordId, fields: updateFields }]
+      });
+      return successResponse({ id: params.recordId, method: "UpdateRecords", apiResult: JSON.stringify(result2) }, "商机更新成功(方式2)");
+    } catch (e2) {
+      return errorResponse("更新商机失败，方式1: " + String(e1) + " | 方式2: " + String(e2), 500);
     }
-    // 如果返回结果没有records但也不是空，可能API返回格式不同
-    return successResponse({ id: params.recordId, result: JSON.stringify(result) }, "商机更新可能成功");
-  } catch (e) {
-    return errorResponse("更新商机失败：" + String(e), 500);
   }
 }
 
