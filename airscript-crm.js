@@ -202,18 +202,30 @@ function handleStoreCreate(params) {
 
 function handleStoreUpdate(params) {
   if (!params.recordId) return errorResponse("缺少 recordId", 400);
-  var updateFields = { "更新时间": todayStr() };
-  if (params.name !== undefined) updateFields["门店名称"] = params.name;
-  if (params.group !== undefined) updateFields["所属集团"] = params.group;
-  if (params.brand !== undefined) updateFields["主营品牌"] = params.brand;
-  if (params.region !== undefined) updateFields["地区"] = params.region;
-  if (params.address !== undefined) updateFields["详细地址"] = params.address;
-  if (params.status !== undefined) updateFields["合作状态"] = params.status;
-  Application.Record.UpdateRecords({
-    SheetId: SHEETS.STORE,
-    Records: [{ id: params.recordId, fields: updateFields }]
-  });
-  return successResponse({ id: params.recordId }, "门店更新成功");
+  
+  // 先读取完整记录，合并字段
+  var record = getRecordById(SHEETS.STORE, params.recordId);
+  if (!record) return errorResponse("门店不存在", 404);
+  var allFields = {};
+  var origFields = record.fields || {};
+  for (var k in origFields) { allFields[k] = origFields[k]; }
+  allFields["更新时间"] = todayStr();
+  if (params.name !== undefined) allFields["门店名称"] = params.name;
+  if (params.group !== undefined) allFields["所属集团"] = params.group;
+  if (params.brand !== undefined) allFields["主营品牌"] = params.brand;
+  if (params.region !== undefined) allFields["地区"] = params.region;
+  if (params.address !== undefined) allFields["详细地址"] = params.address;
+  if (params.status !== undefined) allFields["合作状态"] = params.status;
+  
+  try {
+    Application.Record.UpdateRecords({
+      SheetId: SHEETS.STORE,
+      Records: [{ id: params.recordId, fields: allFields }]
+    });
+    return successResponse({ id: params.recordId }, "门店更新成功");
+  } catch (e) {
+    return errorResponse("更新门店失败：" + String(e), 500);
+  }
 }
 
 // ============ 联系人 API ============
@@ -263,18 +275,28 @@ function handleContactCreate(params) {
 
 function handleContactUpdate(params) {
   if (!params.recordId) return errorResponse("缺少 recordId", 400);
-  var updateFields = {};
-  if (params.name !== undefined) updateFields["姓名"] = params.name;
-  if (params.title !== undefined) updateFields["职务"] = params.title;
-  if (params.phone !== undefined) updateFields["电话"] = params.phone;
-  if (params.wechat !== undefined) updateFields["微信"] = params.wechat;
-  if (params.role !== undefined) updateFields["决策角色"] = params.role;
-  if (params.preferences !== undefined) updateFields["个人喜好"] = params.preferences;
-  Application.Record.UpdateRecords({
-    SheetId: SHEETS.CONTACT,
-    Records: [{ id: params.recordId, fields: updateFields }]
-  });
-  return successResponse({ id: params.recordId }, "联系人更新成功");
+  
+  var record = getRecordById(SHEETS.CONTACT, params.recordId);
+  if (!record) return errorResponse("联系人不存在", 404);
+  var allFields = {};
+  var origFields = record.fields || {};
+  for (var k in origFields) { allFields[k] = origFields[k]; }
+  if (params.name !== undefined) allFields["姓名"] = params.name;
+  if (params.title !== undefined) allFields["职务"] = params.title;
+  if (params.phone !== undefined) allFields["电话"] = params.phone;
+  if (params.wechat !== undefined) allFields["微信"] = params.wechat;
+  if (params.role !== undefined) allFields["决策角色"] = params.role;
+  if (params.preferences !== undefined) allFields["个人喜好"] = params.preferences;
+  
+  try {
+    Application.Record.UpdateRecords({
+      SheetId: SHEETS.CONTACT,
+      Records: [{ id: params.recordId, fields: allFields }]
+    });
+    return successResponse({ id: params.recordId }, "联系人更新成功");
+  } catch (e) {
+    return errorResponse("更新联系人失败：" + String(e), 500);
+  }
 }
 
 function handleContactDelete(params) {
@@ -452,27 +474,37 @@ function handleOpportunityDetail(params) {
 
 function handleOpportunityUpdate(params) {
   if (!params.recordId) return errorResponse("缺少 recordId", 400);
-  var updateFields = {};
-  if (params.stage !== undefined) updateFields["阶段"] = params.stage;
-  if (params.amount !== undefined) updateFields["预计金额"] = params.amount;
-  if (params.name !== undefined) updateFields["商机名称"] = params.name;
 
-  // 方式1: 尝试用 UpdateRecord (单数) — 参数格式不同
+  // 先读取完整记录，合并字段
+  var record = getRecordById(SHEETS.OPPORTUNITY, params.recordId);
+  if (!record) return errorResponse("商机不存在", 404);
+  var allFields = {};
+  // 复制现有所有字段
+  var origFields = record.fields || {};
+  for (var k in origFields) {
+    allFields[k] = origFields[k];
+  }
+  // 合并要更新的字段
+  if (params.stage !== undefined) allFields["阶段"] = params.stage;
+  if (params.amount !== undefined) allFields["预计金额"] = params.amount;
+  if (params.name !== undefined) allFields["商机名称"] = params.name;
+
+  // 尝试 UpdateRecord (单数)
   try {
     var result = Application.Record.UpdateRecord({
       SheetId: SHEETS.OPPORTUNITY,
       RecordId: params.recordId,
-      Fields: updateFields
+      Fields: allFields
     });
-    return successResponse({ id: params.recordId, method: "UpdateRecord", apiResult: JSON.stringify(result) }, "商机更新成功");
+    return successResponse({ id: params.recordId, method: "UpdateRecord" }, "商机更新成功");
   } catch (e1) {
-    // 方式2: 回退到 UpdateRecords (复数) — 原有格式
+    // 回退到 UpdateRecords (复数)
     try {
       var result2 = Application.Record.UpdateRecords({
         SheetId: SHEETS.OPPORTUNITY,
-        Records: [{ id: params.recordId, fields: updateFields }]
+        Records: [{ id: params.recordId, fields: allFields }]
       });
-      return successResponse({ id: params.recordId, method: "UpdateRecords", apiResult: JSON.stringify(result2) }, "商机更新成功(方式2)");
+      return successResponse({ id: params.recordId, method: "UpdateRecords" }, "商机更新成功");
     } catch (e2) {
       return errorResponse("更新商机失败，方式1: " + String(e1) + " | 方式2: " + String(e2), 500);
     }
