@@ -529,4 +529,8 @@ function main() {
   }
 }
 
-return main();
+try {
+  return main();
+} catch (e) {
+  return errorResponse("脚本异常: " + String(e), 500);
+}
