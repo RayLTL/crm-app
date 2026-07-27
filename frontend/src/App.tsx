@@ -3,6 +3,14 @@ import { api } from './api'
 import type { Store, StoreDetail, Contact, Contract, Followup, Opportunity, OpportunityDetail, DashboardData } from './types'
 import { STORE_STATUS, STAGES, ALERT_MAP } from './types'
 
+const STAGE_COLORS: Record<string, string> = {
+  '初步触达': '#94a3b8',
+  '方案报价': '#3b82f6',
+  '商务谈判': '#f59e0b',
+  '盖章签约': '#22c55e',
+  '服务交付': '#8b5cf6',
+}
+
 type Tab = 'dashboard' | 'stores' | 'opportunities' | 'contacts'
 type View = 'list' | 'detail' | 'form' | 'kanban'
 
@@ -335,14 +343,14 @@ function KanbanView({ opportunities, onRefresh, onOppClick }: { opportunities: O
       <div className="section-hd"><span>商机列表</span><button className="btn btn-sm btn-primary" onClick={() => setForm(true)}>+ 新建</button></div>
       <div className="stage-filter">
         <button className={`stage-filter-btn ${stageFilter === '' ? 'active' : ''}`} onClick={() => setStageFilter('')}>全部</button>
-        {STAGES.map(s => <button key={s} className={`stage-filter-btn ${stageFilter === s ? 'active' : ''}`} onClick={() => setStageFilter(s)}>{s}</button>)}
+        {STAGES.map(s => <button key={s} className={`stage-filter-btn ${stageFilter === s ? 'active' : ''}`} style={stageFilter === s ? { background: STAGE_COLORS[s] || '#3b82f6', borderColor: STAGE_COLORS[s] || '#3b82f6' } : {}} onClick={() => setStageFilter(s)}>{s}</button>)}
       </div>
       <div className="kanban-list">
         {grouped.filter(g => g.items.length > 0).map(g => (
           <div key={g.stage} className="stage-group">
-            <div className="stage-title">{g.stage} ({g.items.length})</div>
+            <div className="stage-title" style={{ background: STAGE_COLORS[g.stage] || '#6b7280', color: '#fff', padding: '6px 12px', borderRadius: 6, marginBottom: 8, fontSize: 13, fontWeight: 600 }}>{g.stage} ({g.items.length})</div>
             {g.items.map(o => (
-              <div key={o.id} className="opp-card" onClick={() => onOppClick(o.id)}>
+              <div key={o.id} className="opp-card" onClick={() => onOppClick(o.id)} style={{ borderLeft: `4px solid ${STAGE_COLORS[o.stage] || '#6b7280'}` }}>
                 <div className="opp-name">{o.name}</div>
                 <div className="opp-store">{o.store_name}</div>
                 <div className="opp-amount">¥{o.amount.toLocaleString()}</div>
@@ -413,7 +421,7 @@ function OpportunityDetailView({ detail, onRefresh, onStoreClick }: { detail: Op
       <div className="detail-hero">
         <h2>{detail.name}</h2>
         <div className="detail-tags">
-          <span className="tag" style={{ background: '#6366f1' }}>{detail.stage}</span>
+          <span className="tag" style={{ background: STAGE_COLORS[detail.stage] || '#6366f1' }}>{detail.stage}</span>
         </div>
         <button className="btn btn-sm btn-outline" onClick={() => setEditing(true)}>编辑商机</button>
       </div>
