@@ -106,7 +106,7 @@ export default function App() {
 
         {/* ====== 商机详情 ====== */}
         {tab === 'opportunities' && view === 'detail' && opportunityDetail && (
-          <OpportunityDetailView detail={opportunityDetail} onRefresh={() => gotoOpportunityDetail(opportunityDetail.id)} />
+          <OpportunityDetailView detail={opportunityDetail} onRefresh={() => gotoOpportunityDetail(opportunityDetail.id)} onStoreClick={gotoStoreDetail} />
         )}
 
         {/* ====== 联系人 ====== */}
@@ -353,7 +353,7 @@ function KanbanView({ opportunities, onRefresh, onOppClick }: { opportunities: O
 }
 
 // ====== 商机详情 ======
-function OpportunityDetailView({ detail, onRefresh }: { detail: OpportunityDetail; onRefresh: () => void }) {
+function OpportunityDetailView({ detail, onRefresh, onStoreClick }: { detail: OpportunityDetail; onRefresh: () => void; onStoreClick?: (id: string) => void }) {
   const [editing, setEditing] = useState(false)
   const [editAmount, setEditAmount] = useState(String(detail.amount))
   const [editStage, setEditStage] = useState(detail.stage)
@@ -410,7 +410,7 @@ function OpportunityDetailView({ detail, onRefresh }: { detail: OpportunityDetai
       {detail.store && (
         <div className="sub-section" style={{ marginTop: 12 }}>
           <div className="section-hd"><span>关联门店</span></div>
-          <div className="store-card" style={{ marginTop: 8, cursor: 'default' }}>
+          <div className="store-card" style={{ marginTop: 8, cursor: onStoreClick ? 'pointer' : 'default' }} onClick={() => onStoreClick?.(detail.store!.id)}>
             <div className="store-header">
               <div className="store-avatar">{detail.store.name.charAt(0)}</div>
               <div className="store-info">
