@@ -313,9 +313,12 @@ function KanbanView({ opportunities, onRefresh, onOppClick }: { opportunities: O
   const filtered = stageFilter ? opportunities.filter(o => o.stage === stageFilter) : opportunities
   const grouped = STAGES.map(s => ({ stage: s, items: filtered.filter(o => o.stage === s) }))
 
+  const [changingStages, setChangingStages] = useState<Record<string, boolean>>({})
   const changeStage = async (id: string, newStage: string) => {
-    await api.opportunityUpdate(id, { stage: newStage })
-    onRefresh()
+    setChangingStages(s => ({ ...s, [id]: true }))
+    const r = await api.opportunityUpdate(id, { stage: newStage })
+    if (r.success) onRefresh()
+    setChangingStages(s => ({ ...s, [id]: false }))
   }
 
   return (
@@ -336,7 +339,7 @@ function KanbanView({ opportunities, onRefresh, onOppClick }: { opportunities: O
                 <div className="opp-amount">¥{o.amount.toLocaleString()}</div>
                 <div className="opp-actions" onClick={e => e.stopPropagation()}>
                   {STAGES.map(s => s !== g.stage && (
-                    <button key={s} className="btn btn-xs" onClick={() => changeStage(o.id, s)}>{s}</button>
+                    <button key={s} className="btn btn-xs" disabled={changingStages[o.id]} onClick={() => changeStage(o.id, s)}>{changingStages[o.id] ? '...' : s}</button>
                   ))}
                 </div>
               </div>
@@ -355,6 +358,8 @@ function OpportunityDetailView({ detail, onRefresh }: { detail: OpportunityDetai
   const [editAmount, setEditAmount] = useState(String(detail.amount))
   const [editStage, setEditStage] = useState(detail.stage)
   const [submitting, setSubmitting] = useState(false)
+  const [stageLoading, setStageLoading] = useState<string | null>(null)
+  const [stageError, setStageError] = useState('')
 
   if (editing) {
     return (
@@ -422,13 +427,26 @@ function OpportunityDetailView({ detail, onRefresh }: { detail: OpportunityDetai
         </div>
       )}
 
+      {stageError && <div className="error-msg" style={{ margin: '8px 0', padding: 8, background: '#fef2f2', color: '#dc2626', borderRadius: 6, fontSize: 13 }}>{stageError}</div>}
+
       <div className="sub-section" style={{ marginTop: 12 }}>
         <div className="section-hd"><span>快速推进</span></div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
           {STAGES.map(s => s !== detail.stage && (
-            <button key={s} className="btn btn-sm" style={{ background: '#f3f4f6', border: '1px solid #e5e7eb' }}
-              onClick={async () => { await api.opportunityUpdate(detail.id, { stage: s }); onRefresh() }}>
-              推进至{s}
+            <button key={s} className="btn btn-sm" style={{ background: stageLoading === s ? '#e5e7eb' : '#f3f4f6', border: '1px solid #e5e7eb', opacity: stageLoading ? 0.6 : 1 }}
+              disabled={!!stageLoading}
+              onClick={async () => {
+                setStageLoading(s); setStageError('');
+                try {
+                  const r = await api.opportunityUpdate(detail.id, { stage: s });
+                  if (r.success) { onRefresh(); }
+                  else { setStageError(r.error || '推进失败，请重试'); }
+                } catch (e: any) {
+                  setStageError('网络错误：' + (e.message || '未知错误'));
+                }
+                setStageLoading(null);
+              }}>
+              {stageLoading === s ? '处理中...' : `推进至${s}`}
             </button>
           ))}
         </div>

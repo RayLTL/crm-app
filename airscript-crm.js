@@ -456,11 +456,16 @@ function handleOpportunityUpdate(params) {
   if (params.stage !== undefined) updateFields["阶段"] = params.stage;
   if (params.amount !== undefined) updateFields["预计金额"] = params.amount;
   if (params.name !== undefined) updateFields["商机名称"] = params.name;
-  Application.Record.UpdateRecords({
-    SheetId: SHEETS.OPPORTUNITY,
-    Records: [{ id: params.recordId, fields: updateFields }]
-  });
-  return successResponse({ id: params.recordId }, "商机更新成功");
+  try {
+    var result = Application.Record.UpdateRecords({
+      SheetId: SHEETS.OPPORTUNITY,
+      Records: [{ id: params.recordId, fields: updateFields }]
+    });
+    if (!result) return errorResponse("更新商机失败：API无返回", 500);
+    return successResponse({ id: params.recordId }, "商机更新成功");
+  } catch (e) {
+    return errorResponse("更新商机失败：" + String(e), 500);
+  }
 }
 
 // ============ 首页统计 API ============
