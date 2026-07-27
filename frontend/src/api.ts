@@ -1,72 +1,49 @@
-import type { Customer, CustomerFormData, ApiResponse } from './types'
+import type { ApiResponse, Store, StoreDetail, Contact, Contract, Followup, Opportunity, DashboardData, ListResult } from './types'
 
-// 环境变量配置（通过 .env 文件或 Cloudflare Pages 环境变量设置）
 const AIRSCRIPT_URL = import.meta.env.VITE_AIRSCRIPT_URL || ''
 const AIRSCRIPT_TOKEN = import.meta.env.VITE_AIRSCRIPT_TOKEN || ''
+const API_PATH = AIRSCRIPT_URL ? `/api/airscript${new URL(AIRSCRIPT_URL).pathname}` : ''
 
-// 代理路径: 开发环境走 vite proxy，生产环境走 Pages Functions
-const API_PATH = AIRSCRIPT_URL
-  ? `/api/airscript${new URL(AIRSCRIPT_URL).pathname}`
-  : ''
-
-// 未配置时使用 Mock 模式
-const MOCK_MODE = !API_PATH || !AIRSCRIPT_TOKEN
-
-async function airscriptFetch<T>(action: string, params: Record<string, unknown> = {}): Promise<ApiResponse<T>> {
-  if (MOCK_MODE) {
-    console.warn('[API] Mock mode: 请在 .env 中配置 VITE_AIRSCRIPT_URL 和 VITE_AIRSCRIPT_TOKEN')
-    return { success: false, data: null, error: '未配置后端' }
-  }
-
+async function airscriptFetch<T>(action: string, params: Record<string,unknown> = {}): Promise<ApiResponse<T>> {
+  if (!API_PATH || !AIRSCRIPT_TOKEN) return { success: false, data: null, error: '请在 .env 中配置 VITE_AIRSCRIPT_URL 和 VITE_AIRSCRIPT_TOKEN' }
   const res = await fetch(API_PATH, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'AirScript-Token': AIRSCRIPT_TOKEN,
-    },
-    body: JSON.stringify({
-      Context: { argv: { b: [action, JSON.stringify(params)] } },
-    }),
+    headers: { 'Content-Type': 'application/json', 'AirScript-Token': AIRSCRIPT_TOKEN },
+    body: JSON.stringify({ Context: { argv: { b: [action, JSON.stringify(params)] } } }),
   })
-
   if (!res.ok) throw new Error(`请求失败: ${res.status}`)
-
   const raw = await res.json()
   const result = raw?.data?.result
-  if (!result) return { success: false, data: null, error: '空响应' }
-
-  return typeof result === 'string' ? JSON.parse(result) : result
+  return result ? (typeof result === 'string' ? JSON.parse(result) : result) : { success: false, data: null, error: '空响应' }
 }
 
 export const api = {
-  listCustomers(params?: { search?: string; status?: string; page?: number; pageSize?: number }) {
-    return airscriptFetch<{
-      customers: Customer[]
-      pagination: { page: number; pageSize: number; total: number; totalPages: number }
-    }>('getList', params || {})
-  },
+  // 首页
+  dashboard: () => airscriptFetch<DashboardData>('dashboard'),
 
-  getCustomer(recordId: string) {
-    return airscriptFetch<{ customer: Customer }>('getRecord', { recordId })
-  },
+  // 门店
+  storeList: (p?: { keyword?: string; brand?: string; status?: string; page?: number }) =>
+    airscriptFetch<ListResult<Store>>('storeList', p || {}),
+  storeDetail: (recordId: string) => airscriptFetch<StoreDetail>('storeDetail', { recordId }),
+  storeCreate: (d: any) => airscriptFetch<{ id: string }>('storeCreate', d),
+  storeUpdate: (recordId: string, d: any) => airscriptFetch<{ id: string }>('storeUpdate', { recordId, ...d }),
 
-  createCustomer(data: CustomerFormData) {
-    return airscriptFetch<{ id: string }>('addRecord', data as unknown as Record<string, unknown>)
-  },
+  // 联系人
+  contactList: () => airscriptFetch<ListResult<Contact>>('contactList'),
+  contactCreate: (d: any) => airscriptFetch<{ id: string }>('contactCreate', d),
+  contactUpdate: (recordId: string, d: any) => airscriptFetch<{ id: string }>('contactUpdate', { recordId, ...d }),
+  contactDelete: (recordId: string) => airscriptFetch<{ id: string }>('contactDelete', { recordId }),
 
-  updateCustomer(recordId: string, data: Partial<CustomerFormData>) {
-    return airscriptFetch<{ id: string }>('updateRecord', { recordId, ...data })
-  },
+  // 合同
+  contractList: () => airscriptFetch<ListResult<Contract>>('contractList'),
+  contractCreate: (d: any) => airscriptFetch<{ id: string }>('contractCreate', d),
 
-  deleteCustomer(recordId: string) {
-    return airscriptFetch<{ id: string }>('deleteRecord', { recordId })
-  },
+  // 跟进
+  followupList: (store_id?: string) => airscriptFetch<ListResult<Followup>>('followupList', store_id ? { store_id } : {}),
+  followupCreate: (d: any) => airscriptFetch<{ id: string }>('followupCreate', d),
 
-  getStats() {
-    return airscriptFetch<{
-      total: number
-      byStatus: { status: string; label: string; count: number }[]
-      recentCustomers: { name: string; company: string; status: string }[]
-    }>('getStats', {})
-  },
+  // 商机
+  opportunityList: (stage?: string) => airscriptFetch<ListResult<Opportunity>>('opportunityList', stage ? { stage } : {}),
+  opportunityCreate: (d: any) => airscriptFetch<{ id: string }>('opportunityCreate', d),
+  opportunityUpdate: (recordId: string, d: any) => airscriptFetch<{ id: string }>('opportunityUpdate', { recordId, ...d }),
 }

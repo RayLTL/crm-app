@@ -1,208 +1,454 @@
 import { useState, useEffect } from 'react'
 import { api } from './api'
-import type { Customer, CustomerFormData, Pagination } from './types'
-import { STATUS_MAP } from './types'
-import CustomerForm from './components/CustomerForm'
-import CustomerDetail from './components/CustomerDetail'
+import type { Store, StoreDetail, Contact, Contract, Followup, Opportunity, DashboardData } from './types'
+import { STORE_STATUS, STAGES, ALERT_MAP } from './types'
 
-type PageView = 'list' | 'create' | 'edit' | 'detail'
+type Tab = 'dashboard' | 'stores' | 'opportunities' | 'contacts'
+type View = 'list' | 'detail' | 'form' | 'kanban'
 
 export default function App() {
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const [pagination, setPagination] = useState<Pagination>({ page: 1, pageSize: 20, total: 0, totalPages: 0 })
-  const [stats, setStats] = useState<{ total: number; byStatus: { status: string; label: string; count: number }[] } | null>(null)
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
+  const [tab, setTab] = useState<Tab>('dashboard')
+  const [view, setView] = useState<View>('list')
   const [loading, setLoading] = useState(true)
-  const [view, setView] = useState<PageView>('list')
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [error, setError] = useState('')
+  const [dash, setDash] = useState<DashboardData | null>(null)
+  const [stores, setStores] = useState<Store[]>([])
+  const [storeDetail, setStoreDetail] = useState<StoreDetail | null>(null)
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([])
+  const [filterStatus, setFilterStatus] = useState('')
+  const [filterKeyword, setFilterKeyword] = useState('')
 
-  const loadCustomers = async (page = 1) => {
+  useEffect(() => { loadDashboard(); loadStores(); loadOpportunities() }, [])
+
+  const loadDashboard = async () => { const r = await api.dashboard(); if (r.success && r.data) setDash(r.data) }
+  const loadStores = async () => {
     setLoading(true)
-    setError('')
-    try {
-      const res = await api.listCustomers({ search, status: statusFilter, page })
-      if (res.success && res.data) {
-        setCustomers(res.data.customers)
-        setPagination(res.data.pagination)
-      } else {
-        setError(res.error || '加载失败')
-      }
-    } catch (e: any) {
-      setError(e.message)
-    } finally {
-      setLoading(false)
-    }
+    const r = await api.storeList({ keyword: filterKeyword, status: filterStatus })
+    if (r.success && r.data) setStores(r.data.items)
+    setLoading(false)
+  }
+  const loadOpportunities = async () => {
+    const r = await api.opportunityList()
+    if (r.success && r.data) setOpportunities(r.data.items)
   }
 
-  const loadStats = async () => {
-    const res = await api.getStats()
-    if (res.success && res.data) setStats(res.data)
+  const gotoStoreDetail = async (id: string) => {
+    setLoading(true)
+    const r = await api.storeDetail(id)
+    if (r.success && r.data) { setStoreDetail(r.data); setView('detail') }
+    setLoading(false)
   }
 
-  useEffect(() => { loadCustomers(); loadStats() }, [])
-
-  useEffect(() => {
-    const timer = setTimeout(() => loadCustomers(), 300)
-    return () => clearTimeout(timer)
-  }, [search, statusFilter])
-
-  const handleCreate = async (data: CustomerFormData) => {
-    await api.createCustomer(data)
-    setView('list')
-    loadCustomers()
-    loadStats()
-  }
-
-  const handleUpdate = async (id: string, data: Partial<CustomerFormData>) => {
-    await api.updateCustomer(id, data)
-    setView('detail')
-    loadCustomers()
-    loadStats()
-    const detail = await api.getCustomer(id)
-    if (detail.success && detail.data) setSelectedCustomer(detail.data.customer)
-  }
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('确定要删除该客户吗？')) return
-    await api.deleteCustomer(id)
-    setView('list')
-    setSelectedCustomer(null)
-    loadCustomers()
-    loadStats()
-  }
-
+  // ====== 渲染 ======
   return (
     <div className="app">
+      {/* 头部 */}
       <header className="header">
-        <div className="header-content">
-          <h1 className="logo" onClick={() => { setView('list'); setSelectedCustomer(null) }}>
-            CRM 客户管理系统
-          </h1>
-          <nav className="nav">
-            <button className={`nav-btn ${view === 'list' ? 'active' : ''}`}
-              onClick={() => { setView('list'); setSelectedCustomer(null) }}>
-              客户列表
-            </button>
-            <button className={`nav-btn ${view === 'create' ? 'active' : ''}`}
-              onClick={() => { setView('create'); setSelectedCustomer(null) }}>
-              + 新增客户
-            </button>
-          </nav>
-        </div>
+        <h1 className="logo">
+          {tab === 'dashboard' && '4S店销售CRM'}
+          {tab === 'stores' && (view === 'detail' ? '门店详情' : '门店管理')}
+          {tab === 'opportunities' && '商机看板'}
+          {tab === 'contacts' && '联系人'}
+        </h1>
+        {(view === 'detail' || view === 'form') && (
+          <button className="btn-back" onClick={() => { setView('list'); setStoreDetail(null) }}>返回</button>
+        )}
       </header>
 
       <main className="main">
-        {error && <div className="error-banner">{error}</div>}
+        {error && <div className="error">{error}</div>}
 
-        {view === 'list' && stats && (
-          <div className="stats-grid">
-            <div className="stat-card">
-              <span className="stat-number">{stats.total}</span>
-              <span className="stat-label">总客户数</span>
-            </div>
-            {stats.byStatus.map((s) => (
-              <div className="stat-card" key={s.status}>
-                <span className="stat-number">{s.count}</span>
-                <span className="stat-label" style={{ color: STATUS_MAP[s.status]?.color }}>
-                  {s.label}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* ====== 首页 ====== */}
+        {tab === 'dashboard' && dash && <DashboardView dash={dash} onStoreClick={gotoStoreDetail} />}
 
-        {view === 'list' && (
+        {/* ====== 门店列表 ====== */}
+        {tab === 'stores' && view === 'list' && (
           <>
-            <div className="toolbar">
-              <input type="text" className="search-input" placeholder="搜索客户名称、邮箱、公司..."
-                value={search} onChange={(e) => setSearch(e.target.value)} />
-              <select className="status-select" value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}>
-                <option value="">全部状态</option>
-                <option value="active">合作中</option>
-                <option value="inactive">已暂停</option>
-                <option value="lead">潜在客户</option>
+            <div className="filter-bar">
+              <input className="search" placeholder="搜索门店名称、地区..." value={filterKeyword}
+                onChange={e => setFilterKeyword(e.target.value)} />
+              <select className="filter-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                <option value="">全部</option>
+                {STORE_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
-
-            {loading ? (
-              <div className="loading">加载中...</div>
-            ) : customers.length === 0 ? (
-              <div className="empty">
-                <p>暂无客户数据</p>
-                <button className="btn btn-primary" onClick={() => setView('create')}>添加第一个客户</button>
+            {loading ? <div className="loading">加载中...</div> : (
+              <div className="store-list">
+                {stores.map(s => <StoreCard key={s.id} store={s} onClick={() => gotoStoreDetail(s.id)} />)}
+                {stores.length === 0 && <div className="empty">暂无门店</div>}
               </div>
-            ) : (
-              <>
-                <div className="table-container">
-                  <table className="customer-table">
-                    <thead>
-                      <tr>
-                        <th>姓名</th><th>邮箱</th><th>电话</th><th>公司</th>
-                        <th>状态</th><th>创建时间</th><th>操作</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {customers.map((c) => (
-                        <tr key={c.id} onClick={() => { setSelectedCustomer(c); setView('detail') }} className="clickable-row">
-                          <td className="cell-name">{c.name}</td>
-                          <td>{c.email || '-'}</td>
-                          <td>{c.phone || '-'}</td>
-                          <td>{c.company || '-'}</td>
-                          <td>
-                            <span className="status-badge" style={{ backgroundColor: STATUS_MAP[c.status]?.color || '#999' }}>
-                              {c.statusLabel || STATUS_MAP[c.status]?.label || c.status}
-                            </span>
-                          </td>
-                          <td className="cell-date">{c.created_at}</td>
-                          <td>
-                            <button className="btn btn-sm btn-danger"
-                              onClick={(e) => { e.stopPropagation(); handleDelete(c.id) }}>删除</button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="pagination">
-                  <span className="page-info">共 {pagination.total} 条，第 {pagination.page}/{pagination.totalPages} 页</span>
-                  <div className="page-btns">
-                    <button className="btn btn-sm" disabled={pagination.page <= 1}
-                      onClick={() => loadCustomers(pagination.page - 1)}>上一页</button>
-                    <button className="btn btn-sm" disabled={pagination.page >= pagination.totalPages}
-                      onClick={() => loadCustomers(pagination.page + 1)}>下一页</button>
-                  </div>
-                </div>
-              </>
             )}
           </>
         )}
 
-        {view === 'create' && (
-          <div className="form-page">
-            <h2>新增客户</h2>
-            <CustomerForm onSubmit={handleCreate} onCancel={() => setView('list')} />
-          </div>
+        {/* ====== 门店详情 ====== */}
+        {tab === 'stores' && view === 'detail' && storeDetail && (
+          <StoreDetailView detail={storeDetail} onRefresh={() => gotoStoreDetail(storeDetail.id)} />
         )}
 
-        {view === 'edit' && selectedCustomer && (
-          <div className="form-page">
-            <h2>编辑客户</h2>
-            <CustomerForm initialData={selectedCustomer}
-              onSubmit={(data) => handleUpdate(selectedCustomer.id, data)}
-              onCancel={() => setView('detail')} />
-          </div>
+        {/* ====== 商机看板 ====== */}
+        {tab === 'opportunities' && (
+          <KanbanView opportunities={opportunities} onRefresh={loadOpportunities} />
         )}
 
-        {view === 'detail' && selectedCustomer && (
-          <CustomerDetail customer={selectedCustomer}
-            onEdit={() => setView('edit')}
-            onDelete={() => handleDelete(selectedCustomer.id)}
-            onBack={() => { setView('list'); setSelectedCustomer(null) }} />
-        )}
+        {/* ====== 联系人 ====== */}
+        {tab === 'contacts' && <ContactListView />}
       </main>
+
+      {/* 底部导航 */}
+      <nav className="tab-bar">
+        <button className={`tab-item ${tab === 'dashboard' ? 'active' : ''}`} onClick={() => { setTab('dashboard'); setView('list') }}>
+          📊 首页</button>
+        <button className={`tab-item ${tab === 'stores' ? 'active' : ''}`} onClick={() => { setTab('stores'); setView('list'); loadStores() }}>
+          🏪 门店</button>
+        <button className={`tab-item ${tab === 'opportunities' ? 'active' : ''}`} onClick={() => { setTab('opportunities'); setView('list'); loadOpportunities() }}>
+          📈 商机</button>
+        <button className={`tab-item ${tab === 'contacts' ? 'active' : ''}`} onClick={() => { setTab('contacts'); setView('list') }}>
+          👥 联系人</button>
+      </nav>
     </div>
   )
+}
+
+// ====== 首页 ======
+function DashboardView({ dash, onStoreClick }: { dash: DashboardData; onStoreClick: (id: string) => void }) {
+  return (
+    <div className="dashboard">
+      <div className="stats-row">
+        <div className="stat-card"><span className="stat-num">{dash.monthVisits}</span><span className="stat-lbl">本月拜访</span></div>
+        <div className="stat-card"><span className="stat-num">{dash.monthRenewals}</span><span className="stat-lbl">本月到期续约</span></div>
+        <div className="stat-card"><span className="stat-num">{(dash.totalDeal/10000).toFixed(1)}万</span><span className="stat-lbl">推进中商机</span></div>
+      </div>
+      <h3 className="section-title">今日待办</h3>
+      <div className="task-list">
+        {dash.todayTasks.length === 0 && <div className="empty">暂无待办事项</div>}
+        {dash.todayTasks.map((t, i) => (
+          <div key={i} className={`task-card ${t.type === 'renewal' ? 'alert' : ''}`}>
+            <div className="task-icon">{t.type === 'renewal' ? '⚠️' : '📋'}</div>
+            <div className="task-body">
+              <div className="task-title">{t.topic || t.contract_name}</div>
+              <div className="task-meta">{t.store_name} {t.contact_name}</div>
+              {t.alert && <div className="task-alert">⏰ {t.alert} · {t.end_date}到期</div>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ====== 门店卡片 ======
+function StoreCard({ store, onClick }: { store: Store; onClick: () => void }) {
+  const statusColors: Record<string,string> = { '未签约':'#6b7280','已签约':'#22c55e','待续约':'#f59e0b','已流失':'#ef4444' }
+  return (
+    <div className="store-card" onClick={onClick}>
+      <div className="store-header">
+        <div className="store-avatar">{store.name.charAt(0)}</div>
+        <div className="store-info">
+          <div className="store-name">{store.name}</div>
+          <div className="store-meta">{store.brand} · {store.region}</div>
+        </div>
+        <span className="store-status" style={{ background: statusColors[store.status] || '#999' }}>{store.status}</span>
+      </div>
+      <div className="store-footer">
+        <span>{store.group}</span>
+        <span className="store-arrow">›</span>
+      </div>
+    </div>
+  )
+}
+
+// ====== 门店详情（含切换 Tab） ======
+function StoreDetailView({ detail, onRefresh }: { detail: StoreDetail; onRefresh: () => void }) {
+  const [subTab, setSubTab] = useState<'info'|'contacts'|'contracts'|'followups'>('info')
+  const [formStore, setFormStore] = useState(false)
+  const [formContact, setFormContact] = useState(false)
+  const [formFollowup, setFormFollowup] = useState(false)
+  const [formContract, setFormContract] = useState(false)
+
+  if (formStore) return <StoreForm data={detail} onSave={async (d) => { await api.storeUpdate(detail.id, d); onRefresh(); setFormStore(false) }} onCancel={() => setFormStore(false)} />
+  if (formContact) return <ContactForm storeId={detail.id} storeName={detail.name} onSave={async (d) => { await api.contactCreate(d); onRefresh(); setFormContact(false) }} onCancel={() => setFormContact(false)} />
+  if (formFollowup) return <FollowupForm storeId={detail.id} storeName={detail.name} onSave={async (d) => { await api.followupCreate(d); onRefresh(); setFormFollowup(false) }} onCancel={() => setFormFollowup(false)} />
+  if (formContract) return <ContractForm storeId={detail.id} storeName={detail.name} onSave={async (d) => { await api.contractCreate(d); onRefresh(); setFormContract(false) }} onCancel={() => setFormContract(false)} />
+
+  return (
+    <div className="store-detail">
+      <div className="detail-hero">
+        <h2>{detail.name}</h2>
+        <div className="detail-tags">
+          <span className="tag">{detail.brand}</span>
+          <span className="tag">{detail.region}</span>
+          <span className="tag">{detail.group}</span>
+        </div>
+        <p className="detail-addr">{detail.address}</p>
+        <button className="btn btn-sm btn-outline" onClick={() => setFormStore(true)}>编辑门店</button>
+      </div>
+
+      <div className="sub-tabs">
+        {['info','contacts','contracts','followups'].map(t => (
+          <button key={t} className={`sub-tab ${subTab === t ? 'active' : ''}`} onClick={() => setSubTab(t as any)}>
+            {{info:'概况',contacts:'联系人',contracts:'合同',followups:'跟进'}[t]}
+          </button>
+        ))}
+      </div>
+
+      {subTab === 'contacts' && (
+        <div className="sub-section">
+          <div className="section-hd"><span>联系人 ({detail.contacts.length})</span><button className="btn btn-sm btn-primary" onClick={() => setFormContact(true)}>+ 添加</button></div>
+          {detail.contacts.map(c => <ContactCard key={c.id} contact={c} />)}
+          {detail.contacts.length === 0 && <div className="empty">暂无联系人</div>}
+        </div>
+      )}
+      {subTab === 'contracts' && (
+        <div className="sub-section">
+          <div className="section-hd"><span>合同产品 ({detail.contracts.length})</span><button className="btn btn-sm btn-primary" onClick={() => setFormContract(true)}>+ 添加</button></div>
+          {detail.contracts.map(c => <ContractCard key={c.id} contract={c} />)}
+          {detail.contracts.length === 0 && <div className="empty">暂无合同</div>}
+        </div>
+      )}
+      {subTab === 'followups' && (
+        <div className="sub-section">
+          <div className="section-hd"><span>跟进记录 ({detail.followups.length})</span><button className="btn btn-sm btn-primary" onClick={() => setFormFollowup(true)}>+ 写跟进</button></div>
+          {detail.followups.map(f => (
+            <div key={f.id} className="followup-card">
+              <div className="fu-header"><span className="fu-type">{f.type}</span><span className="fu-date">{f.created_at}</span></div>
+              <div className="fu-topic">{f.topic}</div>
+              <div className="fu-notes">{f.notes}</div>
+              <div className="fu-meta">联系人: {f.contact_name} {f.next_date ? `| 下次跟进: ${f.next_date}` : ''}</div>
+            </div>
+          ))}
+          {detail.followups.length === 0 && <div className="empty">暂无跟进记录</div>}
+        </div>
+      )}
+      {subTab === 'info' && (
+        <div className="sub-section">
+          <div className="info-grid">
+            <div className="info-item"><span className="info-label">所属集团</span><span>{detail.group || '-'}</span></div>
+            <div className="info-item"><span className="info-label">主营品牌</span><span>{detail.brand || '-'}</span></div>
+            <div className="info-item"><span className="info-label">地区</span><span>{detail.region || '-'}</span></div>
+            <div className="info-item"><span className="info-label">合作状态</span><span>{detail.status}</span></div>
+            <div className="info-item"><span className="info-label">地址</span><span>{detail.address || '-'}</span></div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ====== 联系人卡片 ======
+function ContactCard({ contact }: { contact: Contact }) {
+  const [editing, setEditing] = useState(false)
+  if (editing) return <ContactForm storeId={contact.store_id} storeName={contact.store_name} initial={contact} onSave={async (d) => { await api.contactUpdate(contact.id, d); setEditing(false) }} onCancel={() => setEditing(false)} />
+  return (
+    <div className="contact-card">
+      <div className="contact-avatar">{contact.name.charAt(0)}</div>
+      <div className="contact-body">
+        <div className="contact-name">{contact.name} <span className="contact-title">{contact.title}</span></div>
+        <div className="contact-actions">
+          {contact.phone && <a href={`tel:${contact.phone}`} className="contact-btn">📞 {contact.phone}</a>}
+          {contact.wechat && <span className="contact-btn" onClick={() => navigator.clipboard.writeText(contact.wechat)}>💬 复制微信</span>}
+        </div>
+        <div className="contact-meta">决策角色: {contact.role} {contact.preferences ? `| ${contact.preferences}` : ''}</div>
+      </div>
+      <button className="btn-icon" onClick={() => setEditing(true)}>✎</button>
+    </div>
+  )
+}
+
+// ====== 合同卡片 ======
+function ContractCard({ contract }: { contract: Contract }) {
+  return (
+    <div className="contract-card">
+      <div className="contract-hd">
+        <span className="contract-name">{contract.name}</span>
+        <span className="contract-type">{contract.type}</span>
+      </div>
+      <div className="contract-body">
+        <span className="contract-amount">¥{contract.amount.toLocaleString()}</span>
+        <span className="contract-payment">{contract.payment}</span>
+      </div>
+      <div className="contract-footer">
+        <span>{contract.start_date} ~ {contract.end_date}</span>
+        {contract.alert !== '正常' && (
+          <span className="contract-alert" style={{ color: ALERT_MAP[contract.alert] || '#f59e0b' }}>
+            ⚠ {contract.alert}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ====== 商机看板 ======
+function KanbanView({ opportunities, onRefresh }: { opportunities: Opportunity[]; onRefresh: () => void }) {
+  const [form, setForm] = useState(false)
+  const [stageFilter, setStageFilter] = useState('')
+
+  if (form) return <OpportunityForm onSave={async (d) => { await api.opportunityCreate(d); onRefresh(); setForm(false) }} onCancel={() => setForm(false)} />
+
+  const filtered = stageFilter ? opportunities.filter(o => o.stage === stageFilter) : opportunities
+  const grouped = STAGES.map(s => ({ stage: s, items: filtered.filter(o => o.stage === s) }))
+
+  const changeStage = async (id: string, newStage: string) => {
+    await api.opportunityUpdate(id, { stage: newStage })
+    onRefresh()
+  }
+
+  return (
+    <div className="kanban">
+      <div className="section-hd"><span>商机列表</span><button className="btn btn-sm btn-primary" onClick={() => setForm(true)}>+ 新建</button></div>
+      <div className="stage-filter">
+        <button className={`stage-filter-btn ${stageFilter === '' ? 'active' : ''}`} onClick={() => setStageFilter('')}>全部</button>
+        {STAGES.map(s => <button key={s} className={`stage-filter-btn ${stageFilter === s ? 'active' : ''}`} onClick={() => setStageFilter(s)}>{s}</button>)}
+      </div>
+      <div className="kanban-list">
+        {grouped.filter(g => g.items.length > 0).map(g => (
+          <div key={g.stage} className="stage-group">
+            <div className="stage-title">{g.stage} ({g.items.length})</div>
+            {g.items.map(o => (
+              <div key={o.id} className="opp-card">
+                <div className="opp-name">{o.name}</div>
+                <div className="opp-store">{o.store_name}</div>
+                <div className="opp-amount">¥{o.amount.toLocaleString()}</div>
+                <div className="opp-actions">
+                  {STAGES.map(s => s !== g.stage && (
+                    <button key={s} className="btn btn-xs" onClick={() => changeStage(o.id, s)}>{s}</button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
+        {filtered.length === 0 && <div className="empty">暂无商机</div>}
+      </div>
+    </div>
+  )
+}
+
+// ====== 联系人列表 ======
+function ContactListView() {
+  const [contacts, setContacts] = useState<Contact[]>([])
+  const [loading, setLoading] = useState(true)
+  const [form, setForm] = useState(false)
+  useEffect(() => { api.contactList().then(r => { if (r.success && r.data) setContacts(r.data.items); setLoading(false) }) }, [])
+  if (form) return <ContactForm onSave={async (d) => { await api.contactCreate(d); setForm(false); api.contactList().then(r => r.success && r.data && setContacts(r.data.items)) }} onCancel={() => setForm(false)} />
+  return (
+    <div>
+      <div className="section-hd"><span>全部联系人</span><button className="btn btn-sm btn-primary" onClick={() => setForm(true)}>+ 添加</button></div>
+      {loading ? <div className="loading">加载中...</div> : contacts.map(c => <ContactCard key={c.id} contact={c} />)}
+      {!loading && contacts.length === 0 && <div className="empty">暂无联系人</div>}
+    </div>
+  )
+}
+
+// ====== 表单组件 ======
+import { useState as uState } from 'react'
+
+function StoreForm({ data, onSave, onCancel }: { data?: any; onSave: (d:any) => Promise<void>; onCancel: () => void }) {
+  const [f, setF] = uState({ name: data?.name||'', group: data?.group||'', brand: data?.brand||'', region: data?.region||'', address: data?.address||'', status: data?.status||'未签约' })
+  const [sub, setSub] = uState(false)
+  const upd = (k: string, v: string) => setF(p => ({...p, [k]: v}))
+  return <FormWrapper title="门店信息" onCancel={onCancel} onSubmit={async () => { setSub(true); await onSave(f); setSub(false) }} submitting={sub}>
+    <FormInput label="门店名称" value={f.name} onChange={v => upd('name',v)} required />
+    <FormInput label="所属集团" value={f.group} onChange={v => upd('group',v)} />
+    <FormInput label="主营品牌" value={f.brand} onChange={v => upd('brand',v)} />
+    <FormInput label="地区" value={f.region} onChange={v => upd('region',v)} />
+    <FormSelect label="合作状态" value={f.status} onChange={v => upd('status',v)} options={STORE_STATUS as any} />
+    <FormTextarea label="地址" value={f.address} onChange={v => upd('address',v)} />
+  </FormWrapper>
+}
+
+function ContactForm({ storeId, storeName, initial, onSave, onCancel }: { storeId?: string; storeName?: string; initial?: any; onSave: (d:any) => Promise<void>; onCancel: () => void }) {
+  const [f, setF] = uState({ name: initial?.name||'', title: initial?.title||'', phone: initial?.phone||'', wechat: initial?.wechat||'', role: initial?.role||'执行者', preferences: initial?.preferences||'', store_id: storeId||'', store_name: storeName||'' })
+  const [sub, setSub] = uState(false)
+  const upd = (k: string, v: string) => setF(p => ({...p, [k]: v}))
+  return <FormWrapper title={initial?'编辑联系人':'添加联系人'} onCancel={onCancel} onSubmit={async () => { setSub(true); await onSave(f); setSub(false) }} submitting={sub}>
+    <FormInput label="姓名" value={f.name} onChange={v => upd('name',v)} required />
+    <FormSelect label="职务" value={f.title} onChange={v => upd('title',v)} options={['总经理','市场经理','网销经理','二手车经理','销售总监','其他']} />
+    <FormInput label="电话" value={f.phone} onChange={v => upd('phone',v)} type="tel" />
+    <FormInput label="微信" value={f.wechat} onChange={v => upd('wechat',v)} />
+    <FormSelect label="决策角色" value={f.role} onChange={v => upd('role',v)} options={['决策者','影响者','执行者']} />
+    <FormTextarea label="个人喜好/备忘" value={f.preferences} onChange={v => upd('preferences',v)} />
+  </FormWrapper>
+}
+
+function FollowupForm({ storeId, storeName, onSave, onCancel }: { storeId: string; storeName: string; onSave: (d:any) => Promise<void>; onCancel: () => void }) {
+  const [f, setF] = uState({ topic: '', type: '到店拜访', store_id: storeId, store_name: storeName, contact_name: '', notes: '', next_date: '' })
+  const [sub, setSub] = uState(false)
+  const upd = (k: string, v: string) => setF(p => ({...p, [k]: v}))
+  return <FormWrapper title="写跟进" onCancel={onCancel} onSubmit={async () => { setSub(true); await onSave(f); setSub(false) }} submitting={sub}>
+    <FormInput label="跟进主题" value={f.topic} onChange={v => upd('topic',v)} required />
+    <FormSelect label="跟进形式" value={f.type} onChange={v => upd('type',v)} options={['到店拜访','电话','微信']} />
+    <FormInput label="联系人" value={f.contact_name} onChange={v => upd('contact_name',v)} />
+    <FormTextarea label="沟通要点" value={f.notes} onChange={v => upd('notes',v)} />
+    <FormInput label="下一次跟进时间" value={f.next_date} onChange={v => upd('next_date',v)} type="date" />
+  </FormWrapper>
+}
+
+function ContractForm({ storeId, storeName, onSave, onCancel }: { storeId: string; storeName: string; onSave: (d:any) => Promise<void>; onCancel: () => void }) {
+  const [f, setF] = uState({ name: '', type: '其他', store_id: storeId, store_name: storeName, amount: 0, start_date: '', end_date: '', payment: '账期' })
+  const [sub, setSub] = uState(false)
+  const upd = (k: string, v: any) => setF(p => ({...p, [k]: v}))
+  return <FormWrapper title="添加合同" onCancel={onCancel} onSubmit={async () => { setSub(true); await onSave(f); setSub(false) }} submitting={sub}>
+    <FormInput label="产品名称" value={f.name} onChange={v => upd('name',v)} required />
+    <FormSelect label="产品类型" value={f.type} onChange={v => upd('type',v)} options={['线索包','SaaS','硬广','其他']} />
+    <FormInput label="合同金额" value={String(f.amount)} onChange={v => upd('amount',Number(v))} type="number" />
+    <FormInput label="服务开始时间" value={f.start_date} onChange={v => upd('start_date',v)} type="date" />
+    <FormInput label="服务结束时间" value={f.end_date} onChange={v => upd('end_date',v)} type="date" />
+    <FormSelect label="付款状态" value={f.payment} onChange={v => upd('payment',v)} options={['已付','账期']} />
+  </FormWrapper>
+}
+
+function OpportunityForm({ onSave, onCancel }: { onSave: (d:any) => Promise<void>; onCancel: () => void }) {
+  const [f, setF] = uState({ name: '', store_id: '', store_name: '', amount: 0, stage: '初步触达' })
+  const [sub, setSub] = uState(false)
+  const [storeSearch, setStoreSearch] = useState('')
+  const [storeResults, setStoreResults] = useState<Store[]>([])
+  const upd = (k: string, v: any) => setF(p => ({...p, [k]: v}))
+
+  useEffect(() => {
+    if (storeSearch.length < 1) { setStoreResults([]); return }
+    const t = setTimeout(async () => {
+      const r = await api.storeList({ keyword: storeSearch })
+      if (r.success && r.data) setStoreResults(r.data.items)
+    }, 300)
+    return () => clearTimeout(t)
+  }, [storeSearch])
+
+  return <FormWrapper title="新建商机" onCancel={onCancel} onSubmit={async () => { setSub(true); await onSave(f); setSub(false) }} submitting={sub}>
+    <FormInput label="商机名称" value={f.name} onChange={v => upd('name',v)} required />
+    <div className="form-group">
+      <label className="form-label">关联门店</label>
+      <input className="form-input" placeholder="搜索门店..." value={storeSearch} onChange={e => setStoreSearch(e.target.value)} />
+      {storeResults.length > 0 && <div className="search-dropdown">{storeResults.map(s => <div key={s.id} className="search-item" onClick={() => { upd('store_id', s.id); upd('store_name', s.name); setStoreSearch(s.name); setStoreResults([]) }}>{s.name}</div>)}</div>}
+    </div>
+    <FormInput label="门店名称" value={f.store_name} onChange={v => upd('store_name',v)} />
+    <FormInput label="预计金额" value={String(f.amount)} onChange={v => upd('amount',Number(v))} type="number" />
+    <FormSelect label="阶段" value={f.stage} onChange={v => upd('stage',v)} options={STAGES as any} />
+  </FormWrapper>
+}
+
+// ====== 通用表单组件 ======
+function FormWrapper({ title, children, onCancel, onSubmit, submitting }: { title: string; children: React.ReactNode; onCancel: () => void; onSubmit: () => Promise<void>; submitting: boolean }) {
+  return (
+    <div className="form-page">
+      <h2 className="form-title">{title}</h2>
+      <form className="form" onSubmit={e => { e.preventDefault(); onSubmit() }}>
+        {children}
+        <div className="form-actions">
+          <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={submitting}>取消</button>
+          <button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? '提交中...' : '保存'}</button>
+        </div>
+      </form>
+    </div>
+  )
+}
+function FormInput({ label, value, onChange, required, type }: { label: string; value: string; onChange: (v: string) => void; required?: boolean; type?: string }) {
+  return <div className="form-group"><label className="form-label">{label}{required && ' *'}</label><input className="form-input" type={type||'text'} value={value} onChange={e => onChange(e.target.value)} required={required} /></div>
+}
+function FormSelect({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: string[] }) {
+  return <div className="form-group"><label className="form-label">{label}</label><select className="form-input" value={value} onChange={e => onChange(e.target.value)}>{options.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
+}
+function FormTextarea({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return <div className="form-group"><label className="form-label">{label}</label><textarea className="form-input form-textarea" value={value} onChange={e => onChange(e.target.value)} rows={3} /></div>
 }

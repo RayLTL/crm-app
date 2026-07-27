@@ -9,10 +9,7 @@ export default defineConfig({
         target: 'https://www.kdocs.cn',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/airscript/, ''),
-        headers: {
-          Origin: 'https://www.kdocs.cn',
-          Referer: 'https://www.kdocs.cn/',
-        },
+        headers: { Origin: 'https://www.kdocs.cn', Referer: 'https://www.kdocs.cn/' },
       },
     },
   },
