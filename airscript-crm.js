@@ -492,11 +492,12 @@ function handleOpportunityUpdate(params) {
   if (params.amount !== undefined) allFields["预计金额"] = params.amount;
   if (params.name !== undefined) allFields["商机名称"] = params.name;
 
-  // 方式A: 字符串格式 (默认)
+  // 方式A: 用 JSON.stringify 序列化 fields
+  var fieldsStr = JSON.stringify(allFields);
   try {
     var resultA = Application.Record.UpdateRecords({
       SheetId: SHEETS.OPPORTUNITY,
-      Records: [{ id: record.id, fields: allFields }]
+      Records: [{ id: record.id, fields: fieldsStr }]
     });
     return successResponse({
       id: params.recordId,
@@ -505,9 +506,8 @@ function handleOpportunityUpdate(params) {
       apiResult: JSON.stringify(resultA)
     }, "商机更新完成");
   } catch (eA) {
-    // 方式B: 用对象格式 {value}
+    // 方式B: 用对象格式 fields
     try {
-      if (params.stage !== undefined) allFields["阶段"] = { value: params.stage };
       var resultB = Application.Record.UpdateRecords({
         SheetId: SHEETS.OPPORTUNITY,
         Records: [{ id: record.id, fields: allFields }]
@@ -515,7 +515,7 @@ function handleOpportunityUpdate(params) {
       return successResponse({
         id: params.recordId,
         method: "B",
-        stageSent: String(params.stage),
+        stageSent: String(allFields["阶段"]),
         apiResult: JSON.stringify(resultB)
       }, "商机更新完成");
     } catch (eB) {
