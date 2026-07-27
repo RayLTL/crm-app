@@ -20,6 +20,9 @@ export default function App() {
 
   useEffect(() => { loadDashboard(); loadStores(); loadOpportunities() }, [])
 
+  // 筛选条件变化时重新加载门店列表
+  useEffect(() => { loadStores() }, [filterKeyword, filterStatus])
+
   const loadDashboard = async () => { const r = await api.dashboard(); if (r.success && r.data) setDash(r.data) }
   const loadStores = async () => {
     setLoading(true)
@@ -59,7 +62,7 @@ export default function App() {
         {error && <div className="error">{error}</div>}
 
         {/* ====== 首页 ====== */}
-        {tab === 'dashboard' && dash && <DashboardView dash={dash} onStoreClick={gotoStoreDetail} />}
+        {tab === 'dashboard' && dash && <DashboardView dash={dash} onStoreClick={gotoStoreDetail} onNewFollowup={() => { setTab('stores'); setView('list') }} />}
 
         {/* ====== 门店列表 ====== */}
         {tab === 'stores' && view === 'list' && (
@@ -111,7 +114,7 @@ export default function App() {
 }
 
 // ====== 首页 ======
-function DashboardView({ dash, onStoreClick }: { dash: DashboardData; onStoreClick: (id: string) => void }) {
+function DashboardView({ dash, onStoreClick, onNewFollowup }: { dash: DashboardData; onStoreClick: (id: string) => void; onNewFollowup: () => void }) {
   return (
     <div className="dashboard">
       <div className="stats-row">
@@ -119,7 +122,13 @@ function DashboardView({ dash, onStoreClick }: { dash: DashboardData; onStoreCli
         <div className="stat-card"><span className="stat-num">{dash.monthRenewals}</span><span className="stat-lbl">本月到期续约</span></div>
         <div className="stat-card"><span className="stat-num">{(dash.totalDeal/10000).toFixed(1)}万</span><span className="stat-lbl">推进中商机</span></div>
       </div>
-      <h3 className="section-title">今日待办</h3>
+      <div className="section-hd">
+        <h3 className="section-title" style={{margin:0}}>今日待办</h3>
+        <button className="btn btn-sm btn-primary" onClick={onNewFollowup}>+ 写跟进</button>
+      </div>
+      <p style={{fontSize:'12px',color:'var(--gray-400)',marginBottom:'8px'}}>
+        待办来源：到期合同预警（⚠️）在门店详情"合同"Tab中新增；今日跟进提醒（📋）在门店详情"跟进"Tab中录入
+      </p>
       <div className="task-list">
         {dash.todayTasks.length === 0 && <div className="empty">暂无待办事项</div>}
         {dash.todayTasks.map((t, i) => (
@@ -404,16 +413,20 @@ function OpportunityForm({ onSave, onCancel }: { onSave: (d:any) => Promise<void
   const [sub, setSub] = uState(false)
   const [storeSearch, setStoreSearch] = useState('')
   const [storeResults, setStoreResults] = useState<Store[]>([])
+  const [allStores, setAllStores] = useState<Store[]>([])
   const upd = (k: string, v: any) => setF(p => ({...p, [k]: v}))
+
+  // 组件加载时预取所有门店，后续本地搜索
+  useEffect(() => { api.storeList({}).then(r => { if (r.success && r.data) setAllStores(r.data.items) }) }, [])
 
   useEffect(() => {
     if (storeSearch.length < 1) { setStoreResults([]); return }
-    const t = setTimeout(async () => {
-      const r = await api.storeList({ keyword: storeSearch })
-      if (r.success && r.data) setStoreResults(r.data.items)
-    }, 300)
-    return () => clearTimeout(t)
-  }, [storeSearch])
+    const kw = storeSearch.toLowerCase()
+    const filtered = allStores.filter(s =>
+      s.name.toLowerCase().includes(kw) || s.brand.toLowerCase().includes(kw) || s.region.toLowerCase().includes(kw)
+    )
+    setStoreResults(filtered.slice(0, 10))
+  }, [storeSearch, allStores])
 
   return <FormWrapper title="新建商机" onCancel={onCancel} onSubmit={async () => { setSub(true); await onSave(f); setSub(false) }} submitting={sub}>
     <FormInput label="商机名称" value={f.name} onChange={v => upd('name',v)} required />
