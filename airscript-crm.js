@@ -478,35 +478,43 @@ function handleOpportunityUpdate(params) {
   // 先读取完整记录，合并字段
   var record = getRecordById(SHEETS.OPPORTUNITY, params.recordId);
   if (!record) return errorResponse("商机不存在", 404);
+  
   var allFields = {};
-  // 复制现有所有字段
   var origFields = record.fields || {};
   for (var k in origFields) {
     allFields[k] = origFields[k];
   }
-  // 合并要更新的字段
   if (params.stage !== undefined) allFields["阶段"] = params.stage;
   if (params.amount !== undefined) allFields["预计金额"] = params.amount;
   if (params.name !== undefined) allFields["商机名称"] = params.name;
 
-  // 尝试 UpdateRecord (单数)
+  // 方式A: 用 record.id (GetRecords 返回的原始ID)
   try {
-    var result = Application.Record.UpdateRecord({
+    var resultA = Application.Record.UpdateRecords({
       SheetId: SHEETS.OPPORTUNITY,
-      RecordId: params.recordId,
-      Fields: allFields
+      Records: [{ id: record.id, fields: allFields }]
     });
-    return successResponse({ id: params.recordId, method: "UpdateRecord" }, "商机更新成功");
-  } catch (e1) {
-    // 回退到 UpdateRecords (复数)
+    return successResponse({
+      id: params.recordId,
+      method: "A",
+      recordIdType: typeof record.id,
+      recordId: String(record.id),
+      apiResult: JSON.stringify(resultA)
+    }, "商机更新完成");
+  } catch (eA) {
+    // 方式B: 用 params.recordId (前端传过来的ID)
     try {
-      var result2 = Application.Record.UpdateRecords({
+      var resultB = Application.Record.UpdateRecords({
         SheetId: SHEETS.OPPORTUNITY,
         Records: [{ id: params.recordId, fields: allFields }]
       });
-      return successResponse({ id: params.recordId, method: "UpdateRecords" }, "商机更新成功");
-    } catch (e2) {
-      return errorResponse("更新商机失败，方式1: " + String(e1) + " | 方式2: " + String(e2), 500);
+      return successResponse({
+        id: params.recordId,
+        method: "B",
+        apiResult: JSON.stringify(resultB)
+      }, "商机更新完成");
+    } catch (eB) {
+      return errorResponse("更新失败 A:" + String(eA) + " | B:" + String(eB), 500);
     }
   }
 }
