@@ -13,8 +13,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC'
 
 /* 底部导航 */
 .tab-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 200; background: white; border-top: 1px solid var(--gray-200); display: flex; padding-bottom: var(--safe-bottom); max-width: 480px; margin: 0 auto; }
-.tab-item { flex: 1; padding: 8px 0 4px; border: none; background: none; font-size: 11px; color: var(--gray-400); cursor: pointer; text-align: center; }
+.tab-item { flex: 1; padding: 6px 0 6px; border: none; background: none; font-size: 11px; color: var(--gray-400); cursor: pointer; text-align: center; line-height: 1.2; }
 .tab-item.active { color: var(--primary); font-weight: 600; }
+.tab-icon { display: block; font-size: 22px; margin-bottom: 2px; }
 
 /* 通用 */
 .error { background: #fef2f2; color: var(--danger); padding: 10px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }

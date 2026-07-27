@@ -98,13 +98,13 @@ export default function App() {
       {/* 底部导航 */}
       <nav className="tab-bar">
         <button className={`tab-item ${tab === 'dashboard' ? 'active' : ''}`} onClick={() => { setTab('dashboard'); setView('list') }}>
-          📊 首页</button>
+          <span className="tab-icon">📊</span>首页</button>
         <button className={`tab-item ${tab === 'stores' ? 'active' : ''}`} onClick={() => { setTab('stores'); setView('list'); loadStores() }}>
-          🏪 门店</button>
+          <span className="tab-icon">🏪</span>门店</button>
         <button className={`tab-item ${tab === 'opportunities' ? 'active' : ''}`} onClick={() => { setTab('opportunities'); setView('list'); loadOpportunities() }}>
-          📈 商机</button>
+          <span className="tab-icon">📈</span>商机</button>
         <button className={`tab-item ${tab === 'contacts' ? 'active' : ''}`} onClick={() => { setTab('contacts'); setView('list') }}>
-          👥 联系人</button>
+          <span className="tab-icon">👥</span>联系人</button>
       </nav>
     </div>
   )
