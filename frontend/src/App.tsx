@@ -100,7 +100,7 @@ export default function App() {
         )}
 
         {/* ====== 商机看板 ====== */}
-        {tab === 'opportunities' && (
+        {tab === 'opportunities' && view !== 'detail' && (
           <KanbanView opportunities={opportunities} onRefresh={loadOpportunities} onOppClick={gotoOpportunityDetail} />
         )}
 
