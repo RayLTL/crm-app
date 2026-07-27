@@ -115,7 +115,7 @@ export default function App() {
 
         {/* ====== 商机详情 ====== */}
         {tab === 'opportunities' && view === 'detail' && opportunityDetail && (
-          <OpportunityDetailView detail={opportunityDetail} onRefresh={(newId?: string) => gotoOpportunityDetail(newId || opportunityDetail.id)} onStoreClick={gotoStoreFromOpp} />
+          <OpportunityDetailView detail={opportunityDetail} onRefresh={() => gotoOpportunityDetail(opportunityDetail.id)} onStoreClick={gotoStoreFromOpp} />
         )}
 
         {/* ====== 联系人 ====== */}
@@ -362,7 +362,7 @@ function KanbanView({ opportunities, onRefresh, onOppClick }: { opportunities: O
 }
 
 // ====== 商机详情 ======
-function OpportunityDetailView({ detail, onRefresh, onStoreClick }: { detail: OpportunityDetail; onRefresh: (newId?: string) => void; onStoreClick?: (id: string) => void }) {
+function OpportunityDetailView({ detail, onRefresh, onStoreClick }: { detail: OpportunityDetail; onRefresh: () => void; onStoreClick?: (id: string) => void }) {
   const [editing, setEditing] = useState(false)
   const [editAmount, setEditAmount] = useState(String(detail.amount))
   const [editStage, setEditStage] = useState(detail.stage)
@@ -379,7 +379,7 @@ function OpportunityDetailView({ detail, onRefresh, onStoreClick }: { detail: Op
           e.preventDefault(); setSubmitting(true); setEditError('');
           try {
             const r = await api.opportunityUpdate(detail.id, { amount: Number(editAmount), stage: editStage });
-            if (r.success) { onRefresh(r.data?.newId || r.data?.id); setEditing(false); }
+            if (r.success) { onRefresh(); setEditing(false); }
             else { setEditError(r.error || '保存失败'); }
           } catch (e: any) { setEditError('网络错误: ' + (e.message || '')); }
           setSubmitting(false)
@@ -458,7 +458,7 @@ function OpportunityDetailView({ detail, onRefresh, onStoreClick }: { detail: Op
                 setStageLoading(s); setStageError('');
                 try {
                   const r = await api.opportunityUpdate(detail.id, { stage: s });
-                  if (r.success) { onRefresh(r.data?.newId || r.data?.id); }
+                  if (r.success) { onRefresh(); }
                   else { setStageError(r.error || '推进失败，请重试'); }
                 } catch (e: any) {
                   setStageError('网络错误：' + (e.message || '未知错误'));

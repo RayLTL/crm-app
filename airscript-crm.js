@@ -492,23 +492,13 @@ function handleOpportunityUpdate(params) {
   if (params.amount !== undefined) allFields["预计金额"] = params.amount;
   if (params.name !== undefined) allFields["商机名称"] = params.name;
 
-  // 由于 UpdateRecords 对 SingleSelect 字段不支持更新，改用 删除+重建 方式
+  // 用 UpdateRecords 更新（阶段字段下拉选项已设置，现在可正常更新）
   try {
-    // 1. 删除旧记录
-    Application.Record.DeleteRecords({
+    var result = Application.Record.UpdateRecords({
       SheetId: SHEETS.OPPORTUNITY,
-      Records: [{ id: record.id }]
+      Records: [{ id: record.id, fields: allFields }]
     });
-    
-    // 2. 创建新记录（带更新后的字段）
-    var createResp = Application.Record.CreateRecords({
-      SheetId: SHEETS.OPPORTUNITY,
-      Records: [{ fields: allFields }]
-    });
-    var created = Array.isArray(createResp) ? createResp[0] : createResp;
-    if (!created || !created.id) return errorResponse("重建商机记录失败", 500);
-    
-    return successResponse({ id: created.id, newId: created.id }, "商机更新成功");
+    return successResponse({ id: params.recordId }, "商机更新成功");
   } catch (e) {
     return errorResponse("更新商机失败: " + String(e), 500);
   }
