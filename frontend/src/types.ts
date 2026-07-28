@@ -10,6 +10,7 @@ export interface StoreDetail extends Store {
 // ===== 联系人 =====
 export interface Contact {
   id: string; name: string; store_id: string; store_name: string
+  opportunity_name: string
   title: string; phone: string; wechat: string; role: string; preferences: string
 }
 

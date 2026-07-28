@@ -232,14 +232,25 @@ function handleStoreUpdate(params) {
 
 function handleContactList(params) {
   var records = getAllRecords(SHEETS.CONTACT);
+  // 获取所有商机，用于关联门店
+  var opps = getAllRecords(SHEETS.OPPORTUNITY);
+  var oppByStore = {};
+  for (var oi = 0; oi < opps.length; oi++) {
+    var of = opps[oi].fields || {};
+    var sid = of["门店ID"] || "";
+    if (sid && !oppByStore[sid]) oppByStore[sid] = of["商机名称"] || "";
+  }
+
   var result = [];
   for (var i = 0; i < records.length; i++) {
     var f = records[i].fields || {};
+    var sid = f["门店ID"] || "";
     result.push({
       id: records[i].id,
       name: f["姓名"] || "",
-      store_id: f["门店ID"] || "",
+      store_id: sid,
       store_name: f["门店名称"] || "",
+      opportunity_name: oppByStore[sid] || "",
       title: f["职务"] || "",
       phone: f["电话"] || "",
       wechat: f["微信"] || "",

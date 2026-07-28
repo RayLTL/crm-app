@@ -289,7 +289,9 @@ function ContactCard({ contact }: { contact: Contact }) {
           {contact.phone && <a href={`tel:${contact.phone}`} className="contact-btn">📞 {contact.phone}</a>}
           {contact.wechat && <span className="contact-btn" onClick={() => navigator.clipboard.writeText(contact.wechat)}>💬 复制微信</span>}
         </div>
-        <div className="contact-meta">决策角色: {contact.role} {contact.preferences ? `| ${contact.preferences}` : ''}</div>
+        <div className="contact-meta">门店: {contact.store_name || '-'}</div>
+        <div className="contact-meta" style={{ color: 'var(--primary)' }}>商机: {contact.opportunity_name || '-'}</div>
+        <div className="contact-meta">角色: {contact.role} {contact.preferences ? `| ${contact.preferences}` : ''}</div>
       </div>
       <button className="btn-icon" onClick={() => setEditing(true)}>✎</button>
     </div>
